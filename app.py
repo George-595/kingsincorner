@@ -1,6 +1,6 @@
 """
-Kings in the Corner - Unified Complete Game
-Clean Streamlit-native UI with all advanced features
+Kings in the Corner - Pure Streamlit Native Version
+No HTML - only native Streamlit components for maximum compatibility
 """
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
@@ -30,153 +30,123 @@ def init_session_state():
         if key not in st.session_state:
             st.session_state[key] = default_value
 
-def get_card_emoji(card):
-    """Get appropriate emoji/display for a card."""
+def get_card_display(card):
+    """Get card display text with color indicator."""
     if not card:
         return "🂠"
     
     rank = card['rank']
     suit = card['suit']
+    color_indicator = "🔴" if card['color'] == 'red' else "⚫"
     
-    return f"{rank}{suit}"
-
-def get_card_color_style(card):
-    """Get CSS color for card based on suit."""
-    if not card:
-        return "color: black;"
-    
-    if card['color'] == 'red':
-        return "color: #d32f2f; font-weight: bold;"
-    else:
-        return "color: #333; font-weight: bold;"
+    return f"{color_indicator} {rank}{suit}"
 
 def display_pile_simple(pile_data, pile_name, pile_type="foundation"):
-    """Display a pile using simple Streamlit components."""
+    """Display a pile using only Streamlit components."""
     cards = pile_data.get('cards', [])
     is_empty = len(cards) == 0
     
-    # Create container
-    with st.container():
-        # Title
+    # Title
+    if pile_type == "corner":
+        st.subheader(f"👑 {pile_name.upper()}")
+        st.caption("Corner Pile")
+    else:
+        st.subheader(f"📋 {pile_name.upper()}")
+        st.caption("Foundation Pile")
+    
+    # Card display
+    if is_empty:
         if pile_type == "corner":
-            st.write(f"**{pile_name.upper()} CORNER**")
+            st.error("🚫 Kings Only")
         else:
-            st.write(f"**{pile_name.upper()}**")
+            st.success("✅ Any Card")
+        st.caption("Empty pile")
+    else:
+        # Show top card
+        top_card = cards[-1]
+        st.info(f"**{get_card_display(top_card)}**")
         
-        # Card display
-        if is_empty:
-            if pile_type == "corner":
-                st.info("👑 Kings Only")
-            else:
-                st.success("✅ Any Card")
+        # Show stack info
+        if len(cards) > 1:
+            st.caption(f"📚 {len(cards)} cards in stack")
+            # Show recent cards
+            recent = cards[-min(3, len(cards)):]
+            recent_display = []
+            for c in recent:
+                recent_display.append(get_card_display(c))
+            st.caption(f"Recent: {' → '.join(recent_display)}")
         else:
-            # Show top card prominently
-            top_card = cards[-1]
-            st.markdown(f"### {get_card_emoji(top_card)}")
-            
-            # Show stack info
-            if len(cards) > 1:
-                st.caption(f"Stack of {len(cards)} cards")
-                # Show a few recent cards
-                recent = cards[-min(3, len(cards)):]
-                stack_display = " → ".join([get_card_emoji(c) for c in recent])
-                st.caption(f"Recent: {stack_display}")
-            else:
-                st.caption("1 card")
+            st.caption("Single card")
 
 def display_game_board(game_state):
     """Display the game board with clean layout."""
     st.markdown("## 🎲 Game Board")
     
-    # Create 3x3 grid using columns
-    with st.container():
-        # Top row
-        col1, col2, col3 = st.columns(3)
+    # Top row
+    st.markdown("### Top Row")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        display_pile_simple(game_state['corner_piles']['nw'], "NW", "corner")
+    
+    with col2:
+        display_pile_simple(game_state['foundation_piles']['north'], "North", "foundation")
+    
+    with col3:
+        display_pile_simple(game_state['corner_piles']['ne'], "NE", "corner")
+    
+    # Middle row
+    st.markdown("### Middle Row")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        display_pile_simple(game_state['foundation_piles']['west'], "West", "foundation")
+    
+    with col2:
+        # Deck
+        st.subheader("🃏 DRAW PILE")
+        deck_size = game_state['deck_size']
+        st.info(f"**{deck_size} cards remaining**")
         
-        with col1:
-            display_pile_simple(game_state['corner_piles']['nw'], "NW", "corner")
-        
-        with col2:
-            display_pile_simple(game_state['foundation_piles']['north'], "North", "foundation")
-        
-        with col3:
-            display_pile_simple(game_state['corner_piles']['ne'], "NE", "corner")
-        
-        st.markdown("---")
-        
-        # Middle row
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            display_pile_simple(game_state['foundation_piles']['west'], "West", "foundation")
-        
-        with col2:
-            # Deck in center
-            st.write("**🃏 DRAW PILE**")
-            deck_size = game_state['deck_size']
-            st.markdown(f"### 🂠")
-            st.caption(f"{deck_size} cards remaining")
-            
-            if st.button("🃏 Draw Card", key="draw_card", use_container_width=True, type="primary"):
-                success, message = game_manager.draw_card(st.session_state.player_id)
-                if success:
-                    st.success(message)
-                    time.sleep(0.5)
-                    st.rerun()
-                else:
-                    st.error(message)
-        
-        with col3:
-            display_pile_simple(game_state['foundation_piles']['east'], "East", "foundation")
-        
-        st.markdown("---")
-        
-        # Bottom row
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            display_pile_simple(game_state['corner_piles']['sw'], "SW", "corner")
-        
-        with col2:
-            display_pile_simple(game_state['foundation_piles']['south'], "South", "foundation")
-        
-        with col3:
-            display_pile_simple(game_state['corner_piles']['se'], "SE", "corner")
+        if st.button("🃏 Draw a Card", key="draw_card", type="primary", use_container_width=True):
+            success, message = game_manager.draw_card(st.session_state.player_id)
+            if success:
+                st.success(message)
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.error(message)
+    
+    with col3:
+        display_pile_simple(game_state['foundation_piles']['east'], "East", "foundation")
+    
+    # Bottom row
+    st.markdown("### Bottom Row")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        display_pile_simple(game_state['corner_piles']['sw'], "SW", "corner")
+    
+    with col2:
+        display_pile_simple(game_state['foundation_piles']['south'], "South", "foundation")
+    
+    with col3:
+        display_pile_simple(game_state['corner_piles']['se'], "SE", "corner")
 
 def display_hand_interface(player_data):
-    """Display player hand with card selection."""
+    """Display player hand with simple card selection."""
     if not player_data or not player_data['hand']:
         st.info("🃏 No cards in your hand")
         return
     
     st.markdown("## 🃏 Your Hand")
-    st.write("Click cards to select them for playing:")
+    st.write(f"You have {len(player_data['hand'])} cards. Click to select them:")
     
-    # Add global CSS for all card buttons
-    st.markdown("""
-    <style>
-    .stButton > button {
-        font-size: 18px !important;
-        font-weight: bold !important;
-        padding: 20px 8px !important;
-        margin: 3px !important;
-        border-radius: 12px !important;
-        min-height: 85px !important;
-        border-width: 3px !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
-        transition: all 0.2s ease !important;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 12px rgba(0,0,0,0.25) !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Display cards with better layout
+    # Display cards as simple buttons
     hand = player_data['hand']
-    cards_per_row = 7  # Good number for bigger cards
+    
+    # Show cards in rows of 6
+    cards_per_row = 6
     
     for i in range(0, len(hand), cards_per_row):
         cols = st.columns(cards_per_row)
@@ -188,92 +158,39 @@ def display_hand_interface(player_data):
                     card_id = f"{card['rank']}{card['suit']}"
                     is_selected = card_id in st.session_state.selected_cards
                     
-                    # Create colored card display
-                    card_display = get_card_emoji(card)
+                    # Simple button with clear text
+                    card_text = get_card_display(card)
+                    button_text = f"{'✅ ' if is_selected else ''}{card_text}"
+                    button_type = "primary" if is_selected else "secondary"
                     
-                    # Create button text with colors using markdown
-                    if card['color'] == 'red':
-                        if is_selected:
-                            # Selected red card
-                            st.markdown(f"""
-                            <div style="background: #e8f5e8; border: 4px solid #4CAF50; border-radius: 12px; 
-                                        padding: 15px; text-align: center; margin: 3px; color: #d32f2f; 
-                                        font-size: 20px; font-weight: bold; box-shadow: 0 6px 12px rgba(76,175,80,0.3);">
-                                🎯<br>{card_display}
-                            </div>
-                            """, unsafe_allow_html=True)
-                        else:
-                            # Unselected red card
-                            st.markdown(f"""
-                            <div style="background: white; border: 3px solid #d32f2f; border-radius: 12px; 
-                                        padding: 15px; text-align: center; margin: 3px; color: #d32f2f; 
-                                        font-size: 20px; font-weight: bold; box-shadow: 0 4px 8px rgba(211,47,47,0.2);">
-                                {card_display}
-                            </div>
-                            """, unsafe_allow_html=True)
-                    else:
-                        if is_selected:
-                            # Selected black card
-                            st.markdown(f"""
-                            <div style="background: #e8f5e8; border: 4px solid #4CAF50; border-radius: 12px; 
-                                        padding: 15px; text-align: center; margin: 3px; color: #333; 
-                                        font-size: 20px; font-weight: bold; box-shadow: 0 6px 12px rgba(76,175,80,0.3);">
-                                🎯<br>{card_display}
-                            </div>
-                            """, unsafe_allow_html=True)
-                        else:
-                            # Unselected black card
-                            st.markdown(f"""
-                            <div style="background: white; border: 3px solid #333; border-radius: 12px; 
-                                        padding: 15px; text-align: center; margin: 3px; color: #333; 
-                                        font-size: 20px; font-weight: bold; box-shadow: 0 4px 8px rgba(51,51,51,0.2);">
-                                {card_display}
-                            </div>
-                            """, unsafe_allow_html=True)
-                    
-                    # Invisible button for click functionality
-                    if st.button("Select", key=f"card_{i+j}", help=f"Click to {'deselect' if is_selected else 'select'} {card_display}"):
+                    if st.button(button_text, key=f"card_{i+j}", type=button_type, use_container_width=True):
                         if is_selected:
                             st.session_state.selected_cards.remove(card_id)
                         else:
                             st.session_state.selected_cards.append(card_id)
                         st.rerun()
     
-    # Show selection summary with bigger text
+    # Show selection summary
     if st.session_state.selected_cards:
-        selected_display = []
-        for card_id in st.session_state.selected_cards:
-            # Find the actual card to get color
-            for card in hand:
-                if f"{card['rank']}{card['suit']}" == card_id:
-                    color_style = get_card_color_style(card)
-                    selected_display.append(f'<span style="{color_style}">{card_id}</span>')
-                    break
-        
-        st.markdown(f'''
-        <div style="background: #e8f5e8; padding: 15px; border-radius: 10px; margin: 10px 0; text-align: center;">
-            <strong>🎯 Selected Cards:</strong><br>
-            <span style="font-size: 22px;">{" | ".join(selected_display)}</span>
-        </div>
-        ''', unsafe_allow_html=True)
+        st.success(f"✅ Selected: {', '.join(st.session_state.selected_cards)}")
     else:
-        st.info("👆 Click the cards above to select them")
+        st.info("👆 Click cards above to select them")
 
 def display_actions_interface(game_state):
-    """Display action interfaces for playing cards and moving piles."""
+    """Display action interfaces."""
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("### 🎯 Play Cards")
         
         if not st.session_state.selected_cards:
-            st.info("Select cards from your hand first!")
+            st.warning("Select cards from your hand first!")
         else:
             # Pile selection
             all_piles = list(game_state['foundation_piles'].keys()) + list(game_state['corner_piles'].keys())
             
             target_pile = st.selectbox(
-                "Choose target pile:",
+                "Choose destination:",
                 all_piles,
                 format_func=lambda x: f"{x.title()} ({'Corner' if x in game_state['corner_piles'] else 'Foundation'})",
                 key="target_pile"
@@ -363,7 +280,7 @@ def display_actions_interface(game_state):
                     st.error(message)
 
 def display_game_status(game_state):
-    """Display game status and player information."""
+    """Display game status."""
     # Current turn status
     current_player_idx = game_state.get('current_player', -1)
     current_player_name = game_state.get('current_player_name', 'Unknown')
@@ -375,7 +292,7 @@ def display_game_status(game_state):
     
     # Status display
     if is_my_turn:
-        st.success("🎯 **Your Turn!** Play cards, move piles, then end your turn.")
+        st.success("🎯 **YOUR TURN!** Play cards, move piles, then end your turn.")
     else:
         st.info(f"⏳ Waiting for **{current_player_name}** to play...")
     
@@ -383,19 +300,19 @@ def display_game_status(game_state):
     st.markdown("### 👥 Players")
     
     for i, player in enumerate(game_state['players']):
-        status_icons = []
+        icons = []
         if i == current_player_idx:
-            status_icons.append("🎯")
+            icons.append("🎯")
         if player['id'] == st.session_state.player_id:
-            status_icons.append("(You)")
+            icons.append("👤 (You)")
         
-        status_text = " ".join(status_icons)
+        status_text = " ".join(icons)
         st.write(f"**{player['name']}** - {player['hand_size']} cards {status_text}")
     
     return is_my_turn
 
 def display_turn_controls(is_my_turn):
-    """Display turn control buttons."""
+    """Display turn controls."""
     if not is_my_turn:
         return
     
@@ -414,7 +331,7 @@ def display_turn_controls(is_my_turn):
                 st.error("Could not end turn")
     
     with col2:
-        if st.button("🔄 Refresh Game", key="refresh", use_container_width=True):
+        if st.button("🔄 Refresh", key="refresh", use_container_width=True):
             st.rerun()
     
     with col3:
@@ -423,7 +340,7 @@ def display_turn_controls(is_my_turn):
             st.rerun()
 
 def display_rules():
-    """Display game rules."""
+    """Display game rules using native Streamlit."""
     if not st.session_state.show_rules:
         return
     
@@ -431,44 +348,40 @@ def display_rules():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("""
-            **🎯 Objective**
-            Be the first player to play all your cards.
+            st.markdown("**🎯 Objective**")
+            st.write("Be the first player to play all your cards.")
             
-            **🎲 Setup**
-            - Each player gets 7 cards
-            - 4 foundation piles start with 1 card each
-            - 4 corner spaces start empty
+            st.markdown("**🎲 Setup**")
+            st.write("• Each player gets 7 cards")
+            st.write("• 4 foundation piles start with 1 card each")
+            st.write("• 4 corner spaces start empty")
             
-            **🃏 Foundation Piles**
-            - Build DOWN in alternating colors
-            - Red on Black, Black on Red
-            - When empty: ANY card can start new pile
-            - Example: Black 8 → Red 7 → Black 6
-            """)
+            st.markdown("**🃏 Foundation Piles**")
+            st.write("• Build DOWN in alternating colors")
+            st.write("• Red on Black, Black on Red")
+            st.write("• When empty: ANY card can start new pile")
+            st.write("• Example: Black 8 → Red 7 → Black 6")
         
         with col2:
-            st.markdown("""
-            **👑 Corner Piles**
-            - Only KINGS can start corner piles
-            - Build down in alternating colors
-            - Same rules as foundations once started
+            st.markdown("**👑 Corner Piles**")
+            st.write("• Only KINGS can start corner piles")
+            st.write("• Build down in alternating colors")
+            st.write("• Same rules as foundations once started")
             
-            **🔄 Moving Piles**
-            - Move entire piles between locations
-            - Bottom card must fit on destination
-            - Creates strategic opportunities
+            st.markdown("**🔄 Moving Piles**")
+            st.write("• Move entire piles between locations")
+            st.write("• Bottom card must fit on destination")
+            st.write("• Creates strategic opportunities")
             
-            **⚡ Your Turn**
-            - Play as many cards as you want
-            - Move piles between locations
-            - End turn OR draw a card (ends turn)
-            """)
+            st.markdown("**⚡ Your Turn**")
+            st.write("• Play as many cards as you want")
+            st.write("• Move piles between locations")
+            st.write("• End turn OR draw a card (ends turn)")
 
 def main_menu():
     """Main menu interface."""
     st.title("🃏 Kings in the Corner")
-    st.markdown("### Complete Multiplayer Card Game")
+    st.subheader("Complete Multiplayer Card Game")
     
     col1, col2, col3 = st.columns([1, 2, 1])
     
@@ -520,14 +433,12 @@ def main_menu():
         
         # Features
         st.markdown("---")
-        st.markdown("#### ✨ Features")
-        st.markdown("""
-        - **🎯 Multiple cards per turn** - Play as many as you want
-        - **🔄 Pile moving** - Move entire stacks strategically  
-        - **📚 Visual stacking** - See all cards in piles
-        - **📱 Cross-platform** - Works on any device
-        - **⚡ Real-time** - Instant multiplayer updates
-        """)
+        st.markdown("#### ✨ Game Features")
+        st.write("🎯 Multiple cards per turn - Play as many as you want")
+        st.write("🔄 Pile moving - Move entire stacks strategically")
+        st.write("📚 Visual stacking - See all cards in piles")
+        st.write("📱 Cross-platform - Works on any device")
+        st.write("⚡ Real-time - Instant multiplayer updates")
 
 def game_lobby(game_state):
     """Game lobby interface."""
@@ -536,8 +447,8 @@ def game_lobby(game_state):
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        st.markdown(f"### Share this Game ID:")
-        st.code(st.session_state.game_id, language=None)
+        st.markdown("### Share this Game ID:")
+        st.code(st.session_state.game_id)
         
         st.markdown("### 👥 Players")
         for i, player in enumerate(game_state['players']):
@@ -597,8 +508,10 @@ def main_game_interface(game_state):
         # Show limited info when not player's turn
         if player_data and player_data['hand']:
             st.markdown("### 🃏 Your Hand")
-            hand_summary = " ".join([get_card_emoji(card) for card in player_data['hand']])
-            st.info(f"Cards ({len(player_data['hand'])}): {hand_summary}")
+            hand_summary = []
+            for card in player_data['hand']:
+                hand_summary.append(get_card_display(card))
+            st.info(f"Cards ({len(player_data['hand'])}): {', '.join(hand_summary)}")
 
 def main():
     """Main application."""
